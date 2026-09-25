@@ -1,0 +1,37 @@
+name: Inspect Gaming App Source
+
+on:
+  push:
+    paths:
+      - ".github/workflows/inspect-source.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decode and inspect
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64, gzip, pathlib, re
+          parts=[]
+          for i in range(1,6):
+              p=pathlib.Path(f"source_parts/v18_0{i}.py").read_text()
+              m=re.search(r'PART\s*=\s*"([^"]+)"', p)
+              if not m: raise SystemExit(f"missing part {i}")
+              parts.append(m.group(1))
+          src=gzip.decompress(base64.b64decode("".join(parts))).decode("utf-8")
+          print("SOURCE_LENGTH", len(src))
+          lines=src.splitlines()
+          keys=("messagebox", "after(", "alarm", "announce", "announcement", "time up", "warning", "countdown", "remaining", "speak", "winsound")
+          for i,line in enumerate(lines):
+              if any(k in line.lower() for k in keys):
+                  a=max(0,i-4); b=min(len(lines),i+5)
+                  print(f"\n--- lines {a+1}-{b} ---")
+                  for j in range(a,b):
+                      print(f"{j+1}: {lines[j]}")
+          PY
